@@ -50,7 +50,7 @@ class PuzzleSerializer(serializers.ModelSerializer):
     """
     """
     options = OptionsListSerializer(child=OptionsSerializer())
-    diceset = serializers.SlugRelatedField(
+    dicesetdesc = serializers.SlugRelatedField(
         read_only=True,
         slug_field='description')
     createdby = serializers.SerializerMethodField()
@@ -90,7 +90,7 @@ class PuzzleSerializer(serializers.ModelSerializer):
         return puzzle
 
     class Meta:
-        exclude = ['layout', ]
+        exclude = []
         model = models.Puzzle
 
 
@@ -123,9 +123,9 @@ class PlayWordSerializer(serializers.ModelSerializer):
     def get_players(self, obj):
         return serializers.ListSerializer(child=PuzzleWordSerializer()).to_representation(
             models.WordList.objects.filter(word=obj.word,
-                play__puzzle=obj.play.puzzle,
-                play__player__isnull=False)\
-            .exclude(play__player=obj.play.player)
+                                           play__puzzle=obj.play.puzzle,
+                                           play__player__isnull=False)
+                                   .exclude(play__player=obj.play.player)
         )
     # This shadows the "word" field forcing it to use a string
 
