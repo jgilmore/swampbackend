@@ -25,6 +25,9 @@ SECRET_KEY = 'w9m$(2gggfgc%x*9sf!hi-y*!k4$3tmiif#sp^d$bh^9xr-7qv'
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = True
 
+# CORS will be handled by the HTTP server in production, this is just for debugging.
+CORS_ORIGIN_ALLOW_ALL = DEBUG
+
 ALLOWED_HOSTS = []
 
 
@@ -38,10 +41,13 @@ INSTALLED_APPS = [
     'django.contrib.messages',
     'django.contrib.staticfiles',
     'rest_framework',
+    'corsheaders',
     'bog',
 ]
 
+
 MIDDLEWARE = [
+    'corsheaders.middleware.CorsMiddleware',
     'django.middleware.security.SecurityMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
     'django.middleware.common.CommonMiddleware',
