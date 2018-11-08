@@ -2,7 +2,6 @@
 # from bog.serializers import WordListSerializer, UserSerializer
 from bog import serializers
 from . import models
-from django.contrib.auth.models import User
 from rest_framework import viewsets, mixins
 from rest_framework.permissions import IsAdminUser, IsAuthenticatedOrReadOnly, IsAuthenticated
 from rest_framework.decorators import api_view
@@ -55,19 +54,27 @@ def api_root(request, format=None):
     return Response({
         r'diceset':  reverse('diceset-list', request=request, format=format),
         r'play':     reverse('play-list', request=request, format=format),
-        r'word':     reverse('wordlist-list', request=request, format=format),
+        r'words':     reverse('wordlist-list', request=request, format=format),
+        r'word':     reverse('word-list', request=request, format=format),
         r'puzzle':   reverse('puzzle-list', request=request, format=format),
         r'player':   reverse('player-list', request=request, format=format),
+
         r'admin':    reverse('admin:index', request=request, format=format),
     })
 
     # queryset = models.Play.filter(pk=6).words.filter(play__puzzle='play__puzzle')
 
 
-class UserModelView(viewsets.ModelViewSet):
-    queryset = User
-    serializer_class = serializers.UserSerializer
-    permission_classes = (IsAdminUser, )
+class WordListViewSet(viewsets.GenericViewSet,
+                      mixins.CreateModelMixin):
+    """
+    This API access point is called when the player finds a new word on the puzzle.
+    An error is returned if the word doesn't exist on this particular puzzle.
+    Note that the puzzleID is submitted, not the playID. The PlayID will be deduced
+    from the puzzle and the logged in user.
+    """
+    queryset = models.WordList.objects.all()
+    serializer_class = serializers.WordListSerializer
 
 
 class ListCreateDiceSetView(viewsets.ModelViewSet):
@@ -135,8 +142,7 @@ class CreateUpdatePlayView(viewsets.ModelViewSet):
 
 class ListWordsView(viewsets.ModelViewSet):
     """
-    Use this when the player finds a new word on the puzzle
-    Or to retrieve the list of words the player has found.
+    Use this to retrieve the list of words the player has found.
     """
     queryset = models.Play.objects.all()
     serializer_class = serializers.PlayWordListSerializer

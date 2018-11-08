@@ -2,14 +2,77 @@ from rest_framework import serializers
 from rest_framework.serializers import ALL_FIELDS
 from bog import models
 from .pyBogged import bogged
-from django.contrib.auth.models import User
 from django.core.exceptions import PermissionDenied
+from django.db import IntegrityError
 
 
-class UserSerializer(serializers.ModelSerializer):
+class WordListSerializer(serializers.ModelSerializer):
+
+    # This is NOT a related field because we need to catch the errors later on, and
+    # add an "oops" record to the database instead of rejecting it as invalid input.
+    word = serializers.CharField(
+        write_only=True,
+        max_length=25,
+        min_length=2,
+        allow_blank=False,
+        trim_whitespace=True,
+    )
+    puzzle = serializers.SlugRelatedField(
+        write_only=True,
+        slug_field='puzzle',
+        queryset=models.Play.objects.filter(player=None),
+        allow_null=False,
+    )
+
+    def create(self, validated_data):
+        """
+        This function exists becuase it's the only function this serializer
+        is allowed to do, AND we've got some caveats about doing it. Mainly verifying
+        that it's a valid word etc.
+
+        Basically, we go through and try to do everything. If there's an error, it will
+        mostly be a DoesNotExist, and mostly we want to throw that back for the frontend to
+        deal with.
+        """
+
+        # puzzleplay is the universal play object, with player=None
+        puzzleplay = validated_data['puzzle']
+
+        # play is THIS USER'S play object. We'll need this to check what rules this user is
+        # playing by.
+        play = models.Play.objects.filter(puzzle=puzzleplay.puzzle,
+                                          player__user=self.context['request'].user)
+
+
+        try:
+            # Here, we get the correct word record for this word. But note the roundabout method
+            # This is to make sure that it exists FOR THIS PUZZLE. Simply finding it isn't enough.
+            word = models.WordList.objects.filter(play=puzzleplay,
+                                                  word__word=validated_data['word'])[0].word
+        except IndexError:
+            if play.missed:
+                # Track missed words by adding a wordlist record with no word.
+                word = None
+            else:
+                raise ValueError("That word cannot be found on this puzzle, or isn't a word.")
+
+        # Create the wordlist object.
+        wordlist = models.WordList(word=word, play=play, foundtime=validated_data['foundtime'])
+
+        try:
+            wordlist.save()
+        except IntegrityError:
+            # The user entered the same word again.
+            if play.repeats:
+                # Track repeated words by adding a wordlist record with no word.
+                wordlist.word=None
+                wordlist.save()
+
+        return wordlist
+
     class Meta:
-        fields = ALL_FIELDS
-        model = User
+        fields = ['puzzle', 'word', 'foundtime']
+        model = models.WordList
 
 
 class DiceSetSerializer(serializers.HyperlinkedModelSerializer):
@@ -17,12 +80,6 @@ class DiceSetSerializer(serializers.HyperlinkedModelSerializer):
         # fields = ('id', 'description', 'dice')
         fields = ALL_FIELDS
         model = models.DiceSet
-
-
-class WordSerializer(serializers.ModelSerializer):
-    class Meta:
-        fields = ALL_FIELDS
-        model = models.Word
 
 
 class OtherOptionsSerializer(serializers.ModelSerializer):
