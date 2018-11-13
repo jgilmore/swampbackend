@@ -95,7 +95,7 @@ class WordListSerializer(serializers.ModelSerializer):
         model = models.WordList
 
 
-class DiceSetSerializer(serializers.HyperlinkedModelSerializer):
+class DiceSetSerializer(serializers.ModelSerializer):
     class Meta:
         # fields = ('id', 'description', 'dice')
         fields = ALL_FIELDS

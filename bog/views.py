@@ -88,7 +88,9 @@ class WordListViewSet(viewsets.GenericViewSet,
 class ListCreateDiceSetView(viewsets.ModelViewSet):
     queryset = models.DiceSet.objects.all()
     serializer_class = serializers.DiceSetSerializer
-    permission_classes = (IsAdminUser,)
+    permission_classes_by_action = {'list': [IsAuthenticated],
+                                    'create': [IsAdminUser],
+                                    'update': [IsAdminUser]}
 
 
 class ListCreatePuzzleView(viewsets.ModelViewSet):
