@@ -1,12 +1,12 @@
-# from bog.serializers import PlayerSerializer, PuzzleSerializer, DiceSetSerializer, PlaySerializer
-# from bog.serializers import WordListSerializer, UserSerializer
 from bog import serializers
 from . import models
-from rest_framework import viewsets, mixins
+from rest_framework import viewsets, mixins, status
 from rest_framework.permissions import IsAdminUser, IsAuthenticatedOrReadOnly, IsAuthenticated
 from rest_framework.decorators import api_view
 from rest_framework.response import Response
 from rest_framework.reverse import reverse
+from django.shortcuts import get_object_or_404
+from django.db import IntegrityError
 
 # Create your views here.
 
@@ -54,7 +54,7 @@ def api_root(request, format=None):
     return Response({
         r'diceset':  reverse('diceset-list', request=request, format=format),
         r'play':     reverse('play-list', request=request, format=format),
-        r'words':     reverse('wordlist-list', request=request, format=format),
+        r'words':    reverse('wordlist', request=request, format=format, args=(1,)),
         r'word':     reverse('word-list', request=request, format=format),
         r'puzzle':   reverse('puzzle-list', request=request, format=format),
         r'player':   reverse('player-list', request=request, format=format),
@@ -75,6 +75,14 @@ class WordListViewSet(viewsets.GenericViewSet,
     """
     queryset = models.WordList.objects.all()
     serializer_class = serializers.WordListSerializer
+
+    def create(self, request, *args, **kwargs):
+        try:
+            return super().create(request, *args, **kwargs)
+        except IntegrityError as x:
+            print("This code was hit!")
+            print(x)
+            return Response(x.args, status=status.HTTP_409_CONFLICT)
 
 
 class ListCreateDiceSetView(viewsets.ModelViewSet):
@@ -140,15 +148,23 @@ class CreateUpdatePlayView(viewsets.ModelViewSet):
     # TODO: On creation, update with puzzle/player defaults.
 
 
-class ListWordsView(viewsets.ModelViewSet):
+@api_view(["GET"])
+def listwords(request, pk):
     """
-    Use this to retrieve the list of words the player has found.
+    Use this to get a list of words the user has found on
+    this puzzle. 'GET' is the only method allowed.
     """
-    queryset = models.Play.objects.all()
-    serializer_class = serializers.PlayWordListSerializer
+    # request.auth()
+    if(not request.user.is_authenticated):
+        return Response({"Must be authenticated to list words"}, status=status.HTTP_403_FORBIDDEN)
 
-    def get_queryset(self):
-        return models.Play.objects.all()  # filter(player__user=self.request.user)
+    play = get_object_or_404(
+        models.Play,
+        puzzle__pk=pk,
+        player__user=request.user
+    )
+    serializer = serializers.PlayWordListSerializer(play)
+    return Response(serializer.data)
 
 
 class PlayerModelView(viewsets.ModelViewSet):

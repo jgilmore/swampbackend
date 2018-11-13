@@ -34,27 +34,38 @@ class WordListSerializer(serializers.ModelSerializer):
         mostly be a DoesNotExist, and mostly we want to throw that back for the frontend to
         deal with.
         """
+        errormessage = ""
 
         # puzzleplay is the universal play object, with player=None
         puzzleplay = validated_data['puzzle']
 
         # play is THIS USER'S play object. We'll need this to check what rules this user is
         # playing by.
-        play = models.Play.objects.filter(puzzle=puzzleplay.puzzle,
-                                          player__user=self.context['request'].user)
-
+        try:
+            try:
+                play = models.Play.objects.filter(puzzle=puzzleplay.puzzle,
+                                                  player=self.context['request'].user.player)[0]
+            except AttributeError:
+                raise PermissionDenied
+        except IndexError:
+            # There is no play record for this user/puzzle combination. Create it.
+            play = models.Play(puzzle=puzzleplay.puzzle, player=self.context['request'].user.player)
+            play.save()
 
         try:
             # Here, we get the correct word record for this word. But note the roundabout method
             # This is to make sure that it exists FOR THIS PUZZLE. Simply finding it isn't enough.
-            word = models.WordList.objects.filter(play=puzzleplay,
-                                                  word__word=validated_data['word'])[0].word
+            word = models.WordList.objects.filter(
+                play=puzzleplay,
+                word__word=validated_data['word']
+            )[0].word
         except IndexError:
+            errormessage = "invalid word. Not on this puzzle or not a word."
             if play.missed:
                 # Track missed words by adding a wordlist record with no word.
                 word = None
             else:
-                raise ValueError("That word cannot be found on this puzzle, or isn't a word.")
+                raise IntegrityError(errormessage)
 
         # Create the wordlist object.
         wordlist = models.WordList(word=word, play=play, foundtime=validated_data['foundtime'])
@@ -62,11 +73,20 @@ class WordListSerializer(serializers.ModelSerializer):
         try:
             wordlist.save()
         except IntegrityError:
+            errormessage = "Not Unique. Word alread found."
             # The user entered the same word again.
             if play.repeats:
                 # Track repeated words by adding a wordlist record with no word.
-                wordlist.word=None
+                wordlist.word = None
+                # This "save" call should never get a uniqueness check failed, because null!=null
+                # (according to SQL)
                 wordlist.save()
+            else:
+                raise IntegrityError(errormessage)
+
+        # Lie about it: If word=null, raise an integrityError
+        if(wordlist.word is None):
+            raise IntegrityError(errormessage)
 
         return wordlist
 

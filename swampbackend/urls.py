@@ -11,10 +11,10 @@ router.register(r'play', views.CreateUpdatePlayView)
 router.register(r'puzzle', views.ListCreatePuzzleView)
 router.register(r'player', views.PlayerModelView)
 router.register(r'word', views.WordListViewSet, base_name='word')
-router.register(r'wordlist', views.ListWordsView, base_name='wordlist')
 
 urlpatterns = [
     url(r'^', include(router.urls)),
+    url(r'^wordlist/(\d+)/$', views.listwords, name="wordlist"),
     url(r'admin/', admin.site.urls, name='admin'),
     url(r'^$', views.api_root, name='api_root'),
     url(r'^auth/', include('rest_auth.urls')),
