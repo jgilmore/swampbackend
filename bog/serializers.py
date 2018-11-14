@@ -150,14 +150,17 @@ class PuzzleSerializer(serializers.ModelSerializer):
         bog.newgame()
         validated_data['layout'] = bog.layout
 
+        # Get and set the creation user.
+        validated_data['createdby'] = self.context['request'].user
+
         # Create the puzzle record
         puzzle = super().create(validated_data)
 
-        options['puzzle'] = puzzle
+        options[0]['puzzle'] = puzzle
 
         # Create the play record
         playserializer = OtherOptionsSerializer()
-        play = playserializer.create(options)
+        play = playserializer.create(options[0])
 
         # Create the play.words records.
         for word in bog.words:
@@ -171,7 +174,7 @@ class PuzzleSerializer(serializers.ModelSerializer):
         model = models.Puzzle
 
 
-class PlayerSerializer(serializers.HyperlinkedModelSerializer):
+class PlayerSerializer(serializers.ModelSerializer):
     class Meta:
         fields = ('id', 'user', 'minimumwordlength', 'handicap', 'ignoreduration')
         model = models.Player
@@ -204,11 +207,21 @@ class PlayWordSerializer(serializers.ModelSerializer):
                                            play__player__isnull=False)
                                    .exclude(play__player=obj.play.player)
         )
-    # This shadows the "word" field forcing it to use a string
 
     class Meta:
         fields = ('id', 'word', 'foundtime', 'players')
         model = models.WordList
+
+
+class OrderedListSerializer(serializers.ListSerializer):
+    """
+    Subclass to insure that wordlist items are listed alphabetically by word__word.
+    """
+    def to_representation(self, data):
+        return [
+            self.child.to_representation(item)
+            for item in data.order_by('word__word')
+        ]
 
 
 class PlayWordListSerializer(serializers.ModelSerializer):
@@ -219,7 +232,7 @@ class PlayWordListSerializer(serializers.ModelSerializer):
 
     Note that we don't give a hoot about the other fields, only the words.
     """
-    wordlist_set = serializers.ListSerializer(child=PlayWordSerializer())
+    wordlist_set = OrderedListSerializer(child=PlayWordSerializer())
 
     class Meta:
         fields = ('wordlist_set', 'pk')
@@ -232,7 +245,7 @@ class WordRelatedField(serializers.ModelSerializer):
         model = models.WordList
 
 
-class PlaySerializer(serializers.HyperlinkedModelSerializer):
+class PlaySerializer(serializers.ModelSerializer):
     """
     This is only ever called to create plays for a particular player. At the same time,
     "player" is read-only, and is instead set from the logged in user, creating the

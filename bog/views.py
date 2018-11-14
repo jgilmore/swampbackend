@@ -80,8 +80,6 @@ class WordListViewSet(viewsets.GenericViewSet,
         try:
             return super().create(request, *args, **kwargs)
         except IntegrityError as x:
-            print("This code was hit!")
-            print(x)
             return Response(x.args, status=status.HTTP_409_CONFLICT)
 
 
