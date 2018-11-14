@@ -218,10 +218,7 @@ class OrderedListSerializer(serializers.ListSerializer):
     Subclass to insure that wordlist items are listed alphabetically by word__word.
     """
     def to_representation(self, data):
-        return [
-            self.child.to_representation(item)
-            for item in data.order_by('word__word')
-        ]
+        return super().to_representation(data.order_by('word__word'))
 
 
 class PlayWordListSerializer(serializers.ModelSerializer):
